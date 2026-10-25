@@ -22,6 +22,9 @@ target("OcclusionLimitFix")
         description = "Prevents the crash caused by too many occlusion planes and boxes"
     })
 
+    -- keep <Windows.h> from defining min/max macros
+    add_defines("NOMINMAX")
+
     -- add src files
     add_files("src/**.cpp")
     add_headerfiles("src/**.h")
