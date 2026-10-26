@@ -13,7 +13,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	Settings::Load();
 
-	// 14 bytes per hook target: 2 for the crash fix, 3 for the map option
+	// 14 bytes per hook target: 2 for the crash fix, 3 for the map option, 1 for the occluder budget
 	const std::size_t trampolineSize = static_cast<size_t>(2 * 14) + (Settings::skipOcclusionOnMap ? 3 * 14 : 0) + (Settings::maxActiveOccluders > 0 ? 14 : 0);
 	SKSE::Init(a_skse, {
 		.logLevel = Settings::logLevel,
