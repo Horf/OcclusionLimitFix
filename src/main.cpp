@@ -21,11 +21,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		.trampolineSize = trampolineSize,
 	});
 
-	if (REL::Module::IsVR()) {
-		logs::warn("Skyrim VR is not supported, plugin inactive.");
-		return true;
-	}
-
 	if (Settings::invalidLogLevel) {
 		logs::warn("Unknown sLogLevel in OcclusionLimitFix.ini, using info.");
 	}
@@ -34,6 +29,15 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 
 	if (!CrashFix::Install()) {
 		logs::warn("Crash fix inactive, the game behaves as without the plugin. Experimental options are disabled too.");
+		return true;
+	}
+
+	// The experimental options need addresses the VR address library does not have.
+	if (REL::Module::IsVR()) {
+		if (Settings::skipOcclusionOnMap || Settings::maxActiveOccluders > 0) {
+			logs::warn("Skyrim VR: experimental options are not available, only the crash fix is active.");
+		}
+		logs::debug("Trampoline: {} of {} bytes used", SKSE::GetTrampoline().allocated_size(), SKSE::GetTrampoline().capacity());
 		return true;
 	}
 
