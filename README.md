@@ -80,7 +80,7 @@ In game, roughly half of the loaded occluders are active at once. Seen from abov
 | --- | --- | --- | --- |
 | 1.5.97 | tested | tested | tested |
 | 1.6.640 | verified in disassembly | verified in disassembly | verified in disassembly |
-| 1.6.1170 | verified in disassembly | verified in disassembly | verified in disassembly |
+| 1.6.1170 | tested by users | verified in disassembly | verified in disassembly |
 | 1.7.104 | verified in disassembly | verified in disassembly | verified in disassembly |
 | VR | not supported | not supported | not supported |
 
