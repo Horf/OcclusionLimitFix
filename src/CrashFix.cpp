@@ -48,6 +48,9 @@ namespace
 				if (a_used > kPlanesInBuffer) {
 					logs::debug("New maximum: {} plane sets, {} spilled (would have crashed before)", a_used, a_used - kPlanesInBuffer);
 				}
+				else {
+					logs::debug("New maximum: {} plane sets", a_used);
+				}
 				return;
 			}
 		}

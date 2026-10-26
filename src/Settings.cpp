@@ -51,6 +51,6 @@ namespace Settings
 		const auto skip = Read("Experimental", "bSkipOcclusionOnMap", "false", path);
 		skipOcclusionOnMap = skip == "true" || skip == "1";
 
-		maxActiveOccluders = GetPrivateProfileIntA("Experimental", "iMaxActiveOcclusionPlanes", 0, path.c_str());
+		maxActiveOccluders = GetPrivateProfileIntA("Experimental", "iMaxActiveOccluders", 0, path.c_str());
 	}
 }

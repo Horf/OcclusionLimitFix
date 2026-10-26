@@ -29,7 +29,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	if (Settings::invalidLogLevel) {
 		logs::warn("Unknown sLogLevel in OcclusionLimitFix.ini, using info.");
 	}
-	logs::debug("Runtime {}, bSkipOcclusionOnMap = {}, iMaxActiveOcclusionPlanes = {}",
+	logs::debug("Runtime {}, bSkipOcclusionOnMap = {}, iMaxActiveOccluders = {}",
 		REL::Module::get().version().string("."), Settings::skipOcclusionOnMap, Settings::maxActiveOccluders);
 
 	if (!CrashFix::Install()) {
