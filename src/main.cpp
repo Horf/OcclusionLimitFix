@@ -1,5 +1,6 @@
 #include "CrashFix.h"
 #include "MapOcclusion.h"
+#include "OccluderBudget.h"
 #include "Settings.h"
 
 #include <REL/Module.h>
@@ -13,7 +14,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	Settings::Load();
 
 	// 14 bytes per hook target: 2 for the crash fix, 3 for the map option
-	const std::size_t trampolineSize = static_cast<size_t>(2 * 14) + (Settings::skipOcclusionOnMap ? 3 * 14 : 0);
+	const std::size_t trampolineSize = static_cast<size_t>(2 * 14) + (Settings::skipOcclusionOnMap ? 3 * 14 : 0) + (Settings::maxActiveOccluders > 0 ? 14 : 0);
 	SKSE::Init(a_skse, {
 		.logLevel = Settings::logLevel,
 		.trampoline = true,
@@ -28,10 +29,16 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	if (Settings::invalidLogLevel) {
 		logs::warn("Unknown sLogLevel in OcclusionLimitFix.ini, using info.");
 	}
-	logs::debug("Runtime {}, bSkipOcclusionOnMap = {}", REL::Module::get().version().string("."), Settings::skipOcclusionOnMap);
+	logs::debug("Runtime {}, bSkipOcclusionOnMap = {}, iMaxActiveOcclusionPlanes = {}",
+		REL::Module::get().version().string("."), Settings::skipOcclusionOnMap, Settings::maxActiveOccluders);
 
 	if (!CrashFix::Install()) {
-		logs::warn("Crash fix inactive, the game behaves as without the plugin.");
+		logs::warn("Crash fix inactive, the game behaves as without the plugin. Experimental options are disabled too.");
+		return true;
+	}
+
+	if (Settings::maxActiveOccluders > 0) {
+		OccluderBudget::Install();
 	}
 
 	if (Settings::skipOcclusionOnMap && MapOcclusion::Install()) {
