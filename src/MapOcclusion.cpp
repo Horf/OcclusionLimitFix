@@ -4,7 +4,6 @@
 #include <array>
 #include <atomic>
 #include <cstdarg>
-#include <cstdint>
 
 #include <RE/B/BSMultiBound.h>
 #include <RE/B/BSMultiBoundShape.h>
@@ -21,7 +20,6 @@
 #include <REL/ID.h>
 #include <REL/Module.h>
 
-#include <SKSE/Version.h>
 #include <SKSE/Logger.h>
 #include <SKSE/Trampoline.h>
 
@@ -84,11 +82,13 @@ namespace
 
 	struct CallSite
 	{
-		std::uint64_t               functionId;  // SE address library ID of the calling function
-		std::ptrdiff_t              offset;
-		std::array<std::uint8_t, 5> bytes;
-		std::uintptr_t              hook;
-		std::uintptr_t*             original;
+		REL::RelocationID caller;
+		std::ptrdiff_t    offset;
+		REL::RelocationID callee;
+		std::uintptr_t    hook;
+		std::uintptr_t*   original;
+
+		std::uintptr_t Address() const { return caller.address() + offset; }
 	};
 }
 
@@ -96,34 +96,30 @@ namespace MapOcclusion
 {
 	bool Install()
 	{
-		if (REL::Module::get().version() != SKSE::RUNTIME_SSE_1_5_97) {
-			logs::warn("Map occlusion skip is only available for 1.5.97 so far, not enabled.");
-			return false;
-		}
-
 		const auto occluderTest = reinterpret_cast<std::uintptr_t>(&OccluderTest);
 		const auto boundVisible = reinterpret_cast<std::uintptr_t>(&BoundVisible);
 		const auto multiBoundVisible = reinterpret_cast<std::uintptr_t>(&MultiBoundVisible);
 
-		const std::array<CallSite, 5> sites{ {
-			{ 99738, 0xBF, { 0xE8, 0x0C, 0xAF, 0xA8, 0xFF }, occluderTest, &occluderTestOriginal },
-			{ 31398, 0x15D, { 0xE8, 0xFE, 0x95, 0xDF, 0x00 }, boundVisible, &boundVisibleOriginal },
-			{ 99788, 0x4B, { 0xE8, 0x10, 0xFE, 0xFF, 0xFF }, boundVisible, &boundVisibleOriginal },
-			{ 31398, 0x1E9, { 0xE8, 0x62, 0x95, 0xDF, 0x00 }, multiBoundVisible, &multiBoundVisibleOriginal },
-			{ 39262, 0x10A, { 0xE8, 0xE1, 0xB4, 0xC2, 0x00 }, multiBoundVisible, &multiBoundVisibleOriginal },
+		// Verified in Ghidra on 1.5.97, 1.6.640, 1.6.1170 and 1.7.104
+		const std::array<CallSite, 4> sites{ {
+			{ REL::RelocationID(99738, 106382), 0xBF, REL::RelocationID(74649, 76380), occluderTest, &occluderTestOriginal },
+			{ REL::RelocationID(31398, 32189), 0x15D, REL::RelocationID(99787, 106434), boundVisible, &boundVisibleOriginal },
+			{ REL::RelocationID(31398, 32189), REL::Module::IsAE() ? 0x20B : 0x1E9, REL::RelocationID(99786, 106433), multiBoundVisible, &multiBoundVisibleOriginal },
+			{ REL::RelocationID(39262, 40335), 0x10A, REL::RelocationID(99786, 106433), multiBoundVisible, &multiBoundVisibleOriginal },
 		} };
 
 		// All or nothing: check every site before patching any.
 		for (const auto& site : sites) {
-			if (!Patch::BytesMatch(REL::ID(site.functionId).address() + site.offset, site.bytes)) {
-				logs::error("Map occlusion skip: unexpected code in ID {} (patched by another mod?), not patching.", site.functionId);
+			if (!Patch::IsCallTo(site.Address(), site.callee.address())) {
+				logs::error("Map occlusion skip: unexpected code at +0x{:X} (patched by another mod?), not patching.",
+					site.Address() - REL::Module::get().base());
 				return false;
 			}
 		}
 
 		auto& trampoline = SKSE::GetTrampoline();
 		for (const auto& site : sites) {
-			*site.original = trampoline.write_call<5>(REL::ID(site.functionId).address() + site.offset, site.hook);
+			*site.original = trampoline.write_call<5>(site.Address(), site.hook);
 		}
 
 		logs::info("Map occlusion skip installed (experimental).");

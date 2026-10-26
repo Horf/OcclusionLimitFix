@@ -20,6 +20,11 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		.trampolineSize = trampolineSize,
 	});
 
+	if (REL::Module::IsVR()) {
+		logs::warn("Skyrim VR is not supported, plugin inactive.");
+		return true;
+	}
+
 	if (Settings::invalidLogLevel) {
 		logs::warn("Unknown sLogLevel in OcclusionLimitFix.ini, using info.");
 	}
