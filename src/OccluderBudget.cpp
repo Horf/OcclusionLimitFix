@@ -3,6 +3,7 @@
 #include "Settings.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdarg>
 #include <cstdint>
 #include <unordered_set>
@@ -30,22 +31,38 @@ namespace
 	constexpr std::uint32_t kPlaneCost = 1;  // one NiFrustumPlanes in the BSCompoundFrustum
 	constexpr std::uint32_t kBoxCost = 2;    // two NiFrustumPlanes (frustumPlanes[2])
 
-	// Rough size on screen: area divided by squared distance to the camera.
+	// Rough size on screen: area as seen from the camera divided by squared distance.
 	// Plane corners run around the perimeter (0-1-2-3), so 0-1 and 0-3 are adjacent edges.
+	// The cross product of two edges has the length of the area, so its dot product with the
+	// direction to the camera gives area * |cos(angle)|, the area facing the camera.
 	float PlaneWeight(const RE::BSOcclusionPlane* a_plane, const RE::NiPoint3& a_camera)
 	{
 		const auto& c = a_plane->corners;
-		const float area = (c[1] - c[0]).Cross(c[3] - c[0]).Length();
-		const auto  center = (c[0] + c[1] + c[2] + c[3]) * 0.25f;
-		return area / ((center - a_camera).SqrLength() + 1.0f);
+		const auto  normal = (c[1] - c[0]).Cross(c[3] - c[0]);
+		const auto  toCamera = a_camera - (c[0] + c[1] + c[2] + c[3]) * 0.25f;
+		const float dist = toCamera.Length();
+		const float facing = dist > 1.0f ? std::fabs(normal.Dot(toCamera)) / dist : normal.Length();
+		return facing / (dist * dist + 1.0f);
 	}
 
-	// size holds the half extents, so the largest face is 4 times the largest product of two.
+	// size holds the half extents. A box shows each of its three face pairs scaled by
+	// |cos(angle)| between that face and the view direction. The face normals are the
+	// columns of the rotation matrix.
 	float BoxWeight(const RE::BSOcclusionBox* a_box, const RE::NiPoint3& a_camera)
 	{
 		const auto& h = a_box->size;
-		const float face = 4.0f * std::max({ h.x * h.y, h.y * h.z, h.z * h.x });
-		return face / ((a_box->translation - a_camera).SqrLength() + 1.0f);
+		const auto  toCamera = a_camera - a_box->translation;
+		const float dist = toCamera.Length();
+		if (dist <= 1.0f) {
+			return 4.0f * std::max({ h.x * h.y, h.y * h.z, h.z * h.x });
+		}
+		const auto  view = toCamera * (1.0f / dist);
+		const auto& r = a_box->rotation;
+		const float cosX = std::fabs(r.entry[0][0] * view.x + r.entry[1][0] * view.y + r.entry[2][0] * view.z);
+		const float cosY = std::fabs(r.entry[0][1] * view.x + r.entry[1][1] * view.y + r.entry[2][1] * view.z);
+		const float cosZ = std::fabs(r.entry[0][2] * view.x + r.entry[1][2] * view.y + r.entry[2][2] * view.z);
+		const float facing = 4.0f * (h.y * h.z * cosX + h.x * h.z * cosY + h.x * h.y * cosZ);
+		return facing / (dist * dist + 1.0f);
 	}
 
 	// The engine tests boxes for visibility only later (BSCompoundFrustum::AddOccluder),
