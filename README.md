@@ -134,7 +134,7 @@ All addresses are resolved through the Address Library. Hooks are 5-byte branche
 | Wrapper of loop 2 | calls in 31398 + 0x1E9, 39262 + 0x10A | calls in 32189 + 0x20B, 40335 + 0x10A | map option |
 | Per-frame occlusion plane states | call in 35571 + 0x7C | calls in 36574 + 0x7C, 36564 + 0x960 (1.7: 0x972) | occluder budget |
 
-`visibilityState` of `BSOcclusionShape`: 0 untested, 1 active, 2 skipped, 3 skipped by bound test. The engine sets the state of occlusion planes once per frame (SE 99736 / AE 106380) from a view frustum test and a facing test. Boxes are tested later when their state is 0. The occluder budget runs right after that per-frame pass, ranks planes and boxes by area divided by squared distance and sets everything beyond the budget to 2. Boxes it demoted are reset to 0 in the next frame, so the engine's own states are never changed permanently.
+`visibilityState` of `BSOcclusionShape`: 0 untested, 1 active, 2 skipped, 3 skipped by bound test. The engine sets the state of occlusion planes once per frame (SE 99736 / AE 106380) from a view frustum test and a facing test. Boxes are tested later when their state is 0. The occluder budget runs right after that per-frame pass, ranks planes and boxes by the area facing the camera divided by squared distance and sets everything beyond the budget to 2. Boxes it demoted are reset to 0 in the next frame, so the engine's own states are never changed permanently.
 
 ## Building
 
