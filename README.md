@@ -71,8 +71,8 @@ In game, roughly half of the loaded occluders are active at once. Seen from abov
 
 ## Requirements
 
-- [SKSE64](https://www.nexusmods.com/skyrimspecialedition/mods/30379)
-- [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444)
+- [SKSE64](https://www.nexusmods.com/skyrimspecialedition/mods/30379) ([SKSEVR](https://www.nexusmods.com/skyrimspecialedition/mods/30457) for VR)
+- [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444) ([VR Address Library for SKSEVR](https://www.nexusmods.com/skyrimspecialedition/mods/58101) for VR)
 
 ## Supported versions
 
@@ -81,12 +81,13 @@ In game, roughly half of the loaded occluders are active at once. Seen from abov
 | 1.5.97 | tested | tested | tested |
 | 1.6.640 | tested by users | verified in disassembly | verified in disassembly |
 | 1.6.1170 | tested by users | verified in disassembly | verified in disassembly |
-| 1.7.104 | verified in disassembly | verified in disassembly | verified in disassembly |
-| VR | not supported | not supported | not supported |
+| 1.6.1179 (GOG) | same code layout as 1.6.1170, untested | same | same |
+| 1.7.104 | tested by users | verified in disassembly | verified in disassembly |
+| VR | enabled, untested | not available | not available |
 
 Other 1.6.x and 1.7.x builds may work. Before patching, the plugin checks every patched location. If the code does not look as expected (unknown game version, or another mod already patched it), that part stays disabled and the log says why. The game then behaves as without the plugin.
 
-Feedback from AE users is welcome.
+On VR only the crash fix is enabled: the experimental options need addresses the VR Address Library does not have. Feedback from VR and GOG users is welcome.
 
 ## Installation
 
