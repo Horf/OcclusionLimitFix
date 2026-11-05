@@ -25,13 +25,26 @@ namespace
 	constexpr std::uint32_t kBufferEntries = 256;
 	constexpr std::uint32_t kPlanesInBuffer = kBufferEntries - 1;
 
-	// Get/Set pairs nest only as deep as the scene graph. Deeper means a caller broke the pairing.
-	constexpr std::size_t kMaxFrameDepth = 1024;
-
-	// Plane states that do not fit into the caller's buffer, one stack per thread.
-	// Each Get pushes a frame, the matching Set pops it (every Get is followed by exactly one Set).
+	// Plane states that do not fit into the caller's buffer, one stack per thread. A frame is only
+	// added when a Get actually spills, and is matched to its Set by the caller's buffer address.
+	struct Frame
+	{
+		std::uintptr_t buffer;
+		std::size_t    start;  // first entry in overflowStates
+	};
 	thread_local std::vector<std::uint32_t> overflowStates;
-	thread_local std::vector<std::size_t>   frameStarts;
+	thread_local std::vector<Frame>         frames;
+
+	// Drops frames of calls deeper than a_buffer (and a_buffer itself if a_inclusive).
+	// Those belong to calls that never restored their state.
+	// The stack grows downwards, so frames of deeper calls have lower addresses.
+	void DropFrames(std::uintptr_t a_buffer, bool a_inclusive)
+	{
+		while (!frames.empty() && (frames.back().buffer < a_buffer || (a_inclusive && frames.back().buffer == a_buffer))) {
+			overflowStates.resize(frames.back().start);
+			frames.pop_back();
+		}
+	}
 
 	std::atomic<std::uint32_t> maxUsedSeen{ 0 };
 
@@ -68,21 +81,18 @@ namespace
 			a_out[1 + i] = a_frustum->planes[i].activePlanes.underlying();
 		}
 
-		if (frameStarts.size() >= kMaxFrameDepth) {
-			static std::atomic_flag reported{};
-			if (!reported.test_and_set()) {
-				logs::error("Unpaired GetActivePlaneState calls detected, resetting spill stack.");
-			}
-			frameStarts.clear();
-			overflowStates.clear();
+		ReportUsage(used);
+
+		if (used == inBuffer) {
+			return;  // everything fits, nothing to spill
 		}
 
-		frameStarts.push_back(overflowStates.size());
+		const auto buffer = reinterpret_cast<std::uintptr_t>(a_out);
+		DropFrames(buffer, true);
+		frames.push_back({ buffer, overflowStates.size() });
 		for (std::uint32_t i = inBuffer; i < used; ++i) {
 			overflowStates.push_back(a_frustum->planes[i].activePlanes.underlying());
 		}
-
-		ReportUsage(used);
 	}
 
 	// Replaces ID 75076
@@ -99,28 +109,37 @@ namespace
 			a_frustum->planes[i].activePlanes = static_cast<ActivePlane>(a_in[1 + i]);
 		}
 
-		if (frameStarts.empty()) {
-			return;  // Set without Get, nothing was spilled
+		if (frames.empty()) {
+			return;  // nothing spilled on this thread
 		}
 
-		const auto start = frameStarts.back();
-		frameStarts.pop_back();
-
-		for (std::uint32_t i = inBuffer; i < used; ++i) {
-			const auto index = start + (static_cast<std::size_t>(i) - inBuffer);
-			if (index >= overflowStates.size()) {
-				break;
-			}
-			a_frustum->planes[i].activePlanes = static_cast<ActivePlane>(overflowStates[index]);
+		const auto buffer = reinterpret_cast<std::uintptr_t>(a_in);
+		DropFrames(buffer, false);
+		if (frames.empty() || frames.back().buffer != buffer) {
+			return;  // the matching Get did not spill
 		}
 
+		// Plane sets added since the Get keep their current state.
+		const auto start = frames.back().start;
+		for (std::size_t i = 0; start + i < overflowStates.size() && inBuffer + i < used; ++i) {
+			a_frustum->planes[inBuffer + i].activePlanes = static_cast<ActivePlane>(overflowStates[start + i]);
+		}
 		overflowStates.resize(start);
+		frames.pop_back();
+	}
+
+	// The first instruction is a jump: another plugin already took over the function
+	// (E9 = jmp rel32 as written by Detours, FF 25 = jmp [rip] as written by the SKSE trampoline).
+	bool IsRedirected(std::uintptr_t a_address)
+	{
+		const auto* code = reinterpret_cast<const std::uint8_t*>(a_address);
+		return code[0] == 0xE9 || (code[0] == 0xFF && code[1] == 0x25);
 	}
 }
 
 namespace CrashFix
 {
-	bool Install()
+	Result Install()
 	{
 		const REL::Relocation<std::uintptr_t> getTarget{ RELOCATION_ID(75075, 76843) };
 		const REL::Relocation<std::uintptr_t> setTarget{ RELOCATION_ID(75076, 76844) };
@@ -131,8 +150,12 @@ namespace CrashFix
 		constexpr std::array<std::uint8_t, 7> setExpected{ 0x44, 0x8B, 0x81, 0xB8, 0x00, 0x00, 0x00 };
 
 		if (!Patch::BytesMatch(getTarget.address(), getExpected) || !Patch::BytesMatch(setTarget.address(), setExpected)) {
-			logs::error("Crash fix: unexpected code in Get/SetActivePlaneState (patched by another mod?), not patching.");
-			return false;
+			if (IsRedirected(getTarget.address()) && IsRedirected(setTarget.address())) {
+				logs::info("Crash fix: Get/SetActivePlaneState are already redirected by another plugin (e.g. Creation Engine Tweaks), using that instead.");
+				return Result::kOtherPlugin;
+			}
+			logs::error("Crash fix: unexpected code in Get/SetActivePlaneState, no fix applied.");
+			return Result::kFailed;
 		}
 
 		auto& trampoline = SKSE::GetTrampoline();
@@ -140,6 +163,6 @@ namespace CrashFix
 		trampoline.write_branch<5>(setTarget.address(), &SetActivePlaneState);
 
 		logs::info("Crash fix installed, occluder limit of {} plane sets lifted.", kPlanesInBuffer);
-		return true;
+		return Result::kInstalled;
 	}
 }

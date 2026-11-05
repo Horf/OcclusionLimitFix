@@ -27,7 +27,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	logs::debug("Runtime {}, bSkipOcclusionOnMap = {}, iMaxActiveOccluders = {}",
 		REL::Module::get().version().string("."), Settings::skipOcclusionOnMap, Settings::maxActiveOccluders);
 
-	if (!CrashFix::Install()) {
+	if (CrashFix::Install() == CrashFix::Result::kFailed) {
 		logs::warn("Crash fix inactive, the game behaves as without the plugin. Experimental options are disabled too.");
 		return true;
 	}
